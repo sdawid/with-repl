@@ -1,6 +1,6 @@
 #!/bin/sh
 #|
-exec racket -t $0 -m "$@"
+exec racket -t $0 "$@"
 |#
 #lang racket/base
 
@@ -11,10 +11,8 @@ exec racket -t $0 -m "$@"
 (module+ test
   (require rackunit))
 
-(provide main)
-
 ; main method of this script
-(define (main . args)
+(define (main args)
   (let ([st (args->state args)])
     (with-handlers ([exn:break? (λ (x) (printf "~n"))])
       (repl st)
@@ -231,3 +229,6 @@ exec racket -t $0 -m "$@"
   (if (string-empty? line)
       (cons st #f)
       (cons st (string-append (tokens->string (state-tokens st)) " " line))))
+
+(main (vector->list (current-command-line-arguments)))
+

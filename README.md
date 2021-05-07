@@ -23,9 +23,24 @@ Deleted Containers:
 ```
 
 
-## Install
+## How to run
 
 `with` is an executable script written in [Racket](https://racket-lang.org/).
+You can run it directly:
+```bash
+$ ./with echo a b
+echo a b>
+...
+```
+
+or you can compile it using `make`:
+
+```bash
+$ make # will create `./build/with` executable from the script
+$ ./build/with echo a b
+echo a b>
+...
+```
 
 
 ## How to use
