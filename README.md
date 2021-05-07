@@ -61,9 +61,12 @@ echo a b>
     ```bash
     echo a b> c\
     ... d\
-    ... e\
-    ... f
-    a b c d e f
+    ... e
+    a b cde
+    echo a b> c \
+    ... d \
+    ... e
+    a b c d e
     ```
 
 - If you want to run the base command, append a space:

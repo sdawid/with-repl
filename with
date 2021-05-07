@@ -188,6 +188,7 @@ exec racket -t $0 "$@"
   ; empty input - doesn't change base, executes current command if not empty
   (check-handle-input (state '("b" "a") "") "" (state '("b" "a") "") #f)
   (check-handle-input (state '("b" "a") "c d") "" (state '("b" "a") "") "a b c d")
+  (check-handle-input (state '("b" "a") "c d") "e" (state '("b" "a") "") "a b c de")
   ; some input - a command is issued
   (check-handle-input (state '("b" "a") "") " c d " (state '("b" "a") "") "a b  c d ")
   ; line starting with '+' - push-base-tokens
@@ -199,9 +200,10 @@ exec racket -t $0 "$@"
   ; multiline command - appends state line
   (check-handle-input (state '("a") "") "123\\" (state '("a") "123") #f)
   (check-handle-input (state '("a") "") "  123  \\" (state '("a") "  123  ") #f)
-  (check-handle-input (state '("a") "123") "456\\" (state '("a") "123 456") #f)
+  (check-handle-input (state '("a") "123") "456\\" (state '("a") "123456") #f)
+  (check-handle-input (state '("a") "123") "456  \\" (state '("a") "123456  ") #f)
   (check-handle-input (state '("a") "123") "\\" (state '("a") "123") #f)
-  (check-handle-input (state '("a") "+b") "c" (state '("c" "b" "a") "") #f))
+  (check-handle-input (state '("a") "+b") "c" (state '("bc" "a") "") #f))
 ; State String -> (cons State Command)
 ; reads a command based on the input and the state
 (define (handle-input st in)
@@ -210,10 +212,10 @@ exec racket -t $0 "$@"
     [(regexp-match? #rx"^\\+" in) (append-base-tokens st (string-remove-first in))]
     [(regexp-match? #rx"^-+$" in) (pop-base-tokens st (string-length in))]
     [(string-empty? (state-line st)) (create-command st in)]
-    [else (handle-input (state-line-set st "") (line-append (state-line st) in))]))
+    [else (handle-input (state-line-set st "") (string-append (state-line st) in))]))
 
 (define (append-current-line st str)
-  (let ([line-change (λ (l) (line-append l str))])
+  (let ([line-change (λ (l) (string-append l str))])
     (cons (state-line-update st line-change) #f)))
 
 (define (append-base-tokens st line)
