@@ -13,10 +13,11 @@ exec racket -t $0 "$@"
 
 ; main method of this script
 (define (main args)
-  (let ([st (args->state args)])
-    (with-handlers ([exn:break? (λ (x) (printf "~n"))])
-      (repl st)
-      (printf "~n"))))
+  (when (not (null? args))
+    (let ([st (args->state args)])
+      (with-handlers ([exn:break? (λ (x) (printf "~n"))])
+        (repl st)
+        (printf "~n")))))
 
 (define (repl st)
   (let ([input-line (readline (state->prompt st))])
