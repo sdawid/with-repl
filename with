@@ -1,0 +1,233 @@
+#!/bin/sh
+#|
+exec racket -t $0 -m "$@"
+|#
+#lang racket/base
+
+(require racket/system)
+(require racket/string)
+(require readline/readline)
+
+(module+ test
+  (require rackunit))
+
+(provide main)
+
+; main method of this script
+(define (main . args)
+  (let ([st (args->state args)])
+    (with-handlers ([exn:break? (λ (x) (printf "~n"))])
+      (repl st)
+      (printf "~n"))))
+
+(define (repl st)
+  (let ([input-line (readline (state->prompt st))])
+    (when (not (eof-object? input-line))
+      (add-history input-line)
+      (let* ([output (handle-input st input-line)]
+             [new-st (car output)]
+             [command (cdr output)])
+        (when (string? command)
+          (with-handlers ([exn:break? (λ (x) #f)])
+            (system command)))
+        (when (not (equal? 'exit command))
+          (repl new-st))))))
+
+; State := (state Tokens CLine)
+; state of the program
+;
+; where
+;   Tokens := [ListOf String]
+;   stack of command's tokens (list of tokens in a reversed order)
+;
+;   CLine := String
+;   a current command line used in multilines commands
+(struct state [tokens line] #:transparent)
+
+(define (state-tokens-update st fn)
+  (state (fn (state-tokens st)) (state-line st)))
+
+(define (state-line-update st fn)
+  (state (state-tokens st) (fn (state-line st))))
+
+(define (state-line-set st new-line)
+  (state (state-tokens st) new-line))
+
+(define (args->state args)
+  (state (list->tokens args) ""))
+
+(module+ test
+  (check-equal? (list->tokens '()) '())
+  (check-equal? (list->tokens '("a" "b")) '("b" "a"))
+  (check-equal? (list->tokens '(" a " " " " b ")) '("b" "a"))
+  (check-equal? (list->tokens '("a b")) '("a b")))
+; [ListOf String] -> TokenStack
+; converts args into a token stack
+(define (list->tokens args)
+  (filter string-not-empty?
+          (map string-trim
+               (reverse args))))
+
+(module+ test
+  (check-equal? (tokens->string '()) "")
+  (check-equal? (tokens->string '("b" "a")) "a b"))
+; TokenStack -> String
+; converts token stack into a string
+(define (tokens->string tokens)
+  (string-join (reverse tokens)))
+
+
+(module+ test
+  (check-equal? (string->tokens "") '())
+  (check-equal? (string->tokens "  a   b  ") '("b" "a")))
+; String -> TokenStack
+; converts a string into a token stack
+(define (string->tokens s)
+  (reverse
+   (filter string-not-empty?
+           (map string-trim
+                (string-split s " ")))))
+
+(define (tokens-append tokens additional-tokens)
+  (append additional-tokens tokens))
+
+
+
+
+(module+ test
+  (check-equal? (tokens-pop '("b" "a") -1) '("b" "a"))
+  (check-equal? (tokens-pop '("b" "a") 0) '("b" "a"))
+  (check-equal? (tokens-pop '("b" "a") 1) '("a"))
+  (check-equal? (tokens-pop '("b" "a") 2) '())
+  (check-equal? (tokens-pop '("b" "a") 3) '())
+  )
+; TokenStack Number -> TokenStack
+(define (tokens-pop tokens count)
+  (cond
+    [(null? tokens) tokens]
+    [(>= 0 count) tokens]
+    [else (tokens-pop (cdr tokens) (sub1 count))]))
+
+
+(define (line-append line in)
+  (cond
+    [(string-empty? line) in]
+    [(string-empty? in) line]
+    [else (string-append line " " in)]))
+
+
+; String -> Boolean
+(define (string-not-empty? s)
+  (> (string-length s) 0))
+
+; String -> Boolean
+(define (string-empty? s)
+  (= (string-length s) 0))
+
+(module+ test
+  (check-equal? (string-remove-first "") "")
+  (check-equal? (string-remove-first "abc") "bc"))
+; String -> String
+(define (string-remove-first s)
+  (if (string-empty? s)
+      ""
+      (substring s 1 (string-length s))))
+
+
+(module+ test
+  (check-equal? (string-remove-last "") "")
+  (check-equal? (string-remove-last "abc") "ab"))
+; String -> String
+(define (string-remove-last s)
+  (if (string-empty? s)
+      ""
+      (substring s 0 (sub1 (string-length s)))))
+
+(module+ test
+  (check-equal? (string-last "" 10) "")
+  (check-equal? (string-last "abc" 0) "")
+  (check-equal? (string-last "abcd" 2) "cd"))
+; String Number -> String
+(define (string-last s count)
+  (cond
+    [(string-empty? s) ""]
+    [(<= count 0) ""]
+    [else (substring s
+                     (- (string-length s) count)
+                     (string-length s))]))
+
+(define MAX-PROMPT (make-parameter 42))
+
+(module+ test
+  (check-equal? (state->prompt (state '("b" "a") "")) "a b> ")
+  (check-equal? (state->prompt (state '("b" "a") "foobar")) "... ")
+  (parameterize ([MAX-PROMPT 7])
+    (check-equal? (state->prompt (state '("12345") "")) "12345> ")
+    (check-equal? (state->prompt (state '("123456") "")) "..456> ")))
+; State -> String
+; creates a prompt from the State based on the command base tokens
+(define (state->prompt st)
+  (if (string-not-empty? (state-line st))
+      "... "
+      (let ([prompt (string-append (tokens->string (state-tokens st)) "> ")])
+        (if (> (string-length prompt) (MAX-PROMPT))
+            (string-append ".." (string-last prompt (- (MAX-PROMPT) 2)))
+            prompt))))
+
+(module+ test
+  (define (check-handle-input input-state input-line expected-state expected-command)
+    (let* ([actual (handle-input input-state input-line)]
+           [actual-state (car actual)]
+           [actual-command (cdr actual)]
+           [message (format
+                     "input: (~a '~a'), actual-output: (~a '~a'), expected-output: (~a '~a')"
+                     input-state input-line
+                     actual-state actual-command
+                     expected-state expected-command)])
+      (check-equal? actual-state expected-state message)
+      (check-equal? actual-command expected-command message)))
+  ; empty input - doesn't change base, executes current command if not empty
+  (check-handle-input (state '("b" "a") "") "" (state '("b" "a") "") #f)
+  (check-handle-input (state '("b" "a") "c d") "" (state '("b" "a") "") "a b c d")
+  ; some input - a command is issued
+  (check-handle-input (state '("b" "a") "") " c d " (state '("b" "a") "") "a b  c d ")
+  ; line starting with '+' - push-base-tokens
+  (check-handle-input (state '("b" "a") "") "+ c  d  " (state '("d" "c" "b" "a") "") #f)
+  ; line containing only '-' - remove base tokens
+  (check-handle-input (state '("b" "a") "") "-" (state '("a") "") #f)
+  (check-handle-input (state '("b" "a") "") "--" (state '() "") 'exit)
+  (check-handle-input (state '("b" "a") "") "---" (state '() "") 'exit)
+  ; multiline command - appends state line
+  (check-handle-input (state '("a") "") "123\\" (state '("a") "123") #f)
+  (check-handle-input (state '("a") "") "  123  \\" (state '("a") "  123  ") #f)
+  (check-handle-input (state '("a") "123") "456\\" (state '("a") "123 456") #f)
+  (check-handle-input (state '("a") "123") "\\" (state '("a") "123") #f)
+  (check-handle-input (state '("a") "+b") "c" (state '("c" "b" "a") "") #f))
+; State String -> (cons State Command)
+; reads a command based on the input and the state
+(define (handle-input st in)
+  (cond
+    [(regexp-match? #rx"\\\\$" in) (append-current-line st (string-remove-last in))]
+    [(regexp-match? #rx"^\\+" in) (append-base-tokens st (string-remove-first in))]
+    [(regexp-match? #rx"^-+$" in) (pop-base-tokens st (string-length in))]
+    [(string-empty? (state-line st)) (create-command st in)]
+    [else (handle-input (state-line-set st "") (line-append (state-line st) in))]))
+
+(define (append-current-line st str)
+  (let ([line-change (λ (l) (line-append l str))])
+    (cons (state-line-update st line-change) #f)))
+
+(define (append-base-tokens st line)
+  (let ([tokens-change (λ (ts) (tokens-append ts (string->tokens line)))])
+    (cons (state-tokens-update st tokens-change) #f)))
+   
+(define (pop-base-tokens st count)
+  (let* ([tokens-change (λ (ts) (tokens-pop ts count))]
+         [new-state (state-tokens-update st tokens-change)])
+    (cons new-state
+          (if (null? (state-tokens new-state)) 'exit #f))))
+
+(define (create-command st line)
+  (if (string-empty? line)
+      (cons st #f)
+      (cons st (string-append (tokens->string (state-tokens st)) " " line))))
