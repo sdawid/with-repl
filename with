@@ -121,6 +121,8 @@ exec racket -t $0 "$@"
       [(regexp-match? #rx"^-+$" line)
        (let ([st (popn-command-list st (string-length line))])
          (cons st (if (empty-command-list? st) 'exit 'continue)))]
+      [(regexp-match? #rx"^\\!" line)
+       (cons st (strip-first-char line))]
       [(equal? "" line)
        (cons st 'continue)]
       [else
@@ -171,7 +173,12 @@ exec racket -t $0 "$@"
   (test-case (state '("a") "b")         "c \\"
              (state '("a") "bc ")       'continue)
   (test-case (state '("a") "a")         "\\"
-             (state '("a") "a")         'continue))
+             (state '("a") "a")         'continue)
+  ; execute new shell subcommand
+  (test-case (state '("a") "")          "!b"
+             (state '("a") "")          "b")
+  (test-case (state '("a") "!b")         "c"
+             (state '("a") "")          "bc"))
 
 
 ; start repl

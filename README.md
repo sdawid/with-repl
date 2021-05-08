@@ -3,7 +3,6 @@
 `with` adds REPL capabilities to shell commands.
 It will execute commands created by appending read lines to the base command.
 
-
 It's a nice way to run the same command with changed arguments:
 
 ```bash
@@ -93,15 +92,15 @@ echo a b>
 
 - Use `Ctrl+D` (EOT) or `Ctrl+C` (SIGINT) to exit the REPL.
 
-
-## Planned Features / Ideas
-
 - Run arbitrary shell commands using `!` prefix:
 
     ```bash
     echo a b> !ls
-    README.md   with*
+    README.md   with
     ```
+
+
+## Planned Features / Ideas
 
 - Set environment variables using `!` prefix:
 
