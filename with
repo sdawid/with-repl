@@ -8,6 +8,8 @@ exec racket -t $0 "$@"
                   drop-right)
          (only-in racket/match
                   match-let)
+         (only-in racket/port
+                  with-output-to-string)
          (only-in racket/string
                   string-join
                   string-trim
@@ -102,12 +104,23 @@ exec racket -t $0 "$@"
     (when (not (eof-object? input-line))
       (readline:add-history input-line)
       (match-let ([(cons new-st action) (handle-input-line st input-line)])
-        (when (string? action) (execute-command action) (repl-loop new-st))
-        (when (equal? 'continue action) (repl-loop new-st))))))
+        (cond
+          [(string? action)
+           (execute-command action)
+           (repl-loop new-st)]
+          [(pair? action)
+           (putenv (car action) (get-value (cdr action)))
+           (repl-loop new-st)]
+          [(equal? 'continue action)
+           (repl-loop new-st)])))))
 
 (define (execute-command command)
   (with-handlers ([exn:break? (λ (x) #f)])
     (system command)))
+
+(define (get-value line)
+  (let ([command (string-append "echo " line)])
+    (string-trim (with-output-to-string (λ() (system command))))))
 
 ; REPL loop logic - applies imput to the REPL state
 (define (handle-input-line st line)
@@ -121,12 +134,15 @@ exec racket -t $0 "$@"
       [(regexp-match? #rx"^-+$" line)
        (let ([st (popn-command-list st (string-length line))])
          (cons st (if (empty-command-list? st) 'exit 'continue)))]
+      [(regexp-match #rx"^\\! *([a-zA-Z_0-9]+) *=(.*)$" line)
+       => (λ (m) (cons st (cons (cadr m) (string-trim (caddr m)))))]
       [(regexp-match? #rx"^\\!" line)
        (cons st (strip-first-char line))]
       [(equal? "" line)
        (cons st 'continue)]
       [else
        (cons st (format-full-command st line))])))
+
 
 (module+ test
   (define (test-case given-state given-input expected-state expected-action)
@@ -177,9 +193,14 @@ exec racket -t $0 "$@"
   ; execute new shell subcommand
   (test-case (state '("a") "")          "!b"
              (state '("a") "")          "b")
-  (test-case (state '("a") "!b")         "c"
-             (state '("a") "")          "bc"))
+  (test-case (state '("a") "!b")        "c"
+             (state '("a") "")          "bc")
+  ; set env variable
+  (test-case (state '("a") "")          "!FOO=123"
+             (state '("a") "")          (cons "FOO" "123"))
+  (test-case (state '("a") "")          "!  foo =  "
+             (state '("a") "")          (cons "foo" "")))
 
-
+ 
 ; start repl
 (start-repl (vector->list (current-command-line-arguments)))

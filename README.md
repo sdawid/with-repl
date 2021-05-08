@@ -99,9 +99,6 @@ echo a b>
     README.md   with
     ```
 
-
-## Planned Features / Ideas
-
 - Set environment variables using `!` prefix:
 
     ```bash
