@@ -1,7 +1,15 @@
 # `with` REPL
 
-`with` adds REPL capabilities to shell commands.
-It will execute commands created by appending read lines to the base command.
+`with` adds REPL-like capabilities to shell commands.
+
+```bash
+$ with echo a
+echo a> b c             # will run `echo a b c` command
+a b c
+echo a> d e             # will run `echo a d e` command
+a d e
+```
+
 
 It's a nice way to run the same command with changed arguments:
 
@@ -24,19 +32,21 @@ Deleted Containers:
 
 ## How to run
 
-`with` is an executable script written in [Racket](https://racket-lang.org/).
+`with.scm` is an executable script written in [GNU Guile](https://www.gnu.org/software/guile).
+
+
 You can run it directly:
+
 ```bash
-$ ./with echo a b
+$ ./with.scm echo a b
 echo a b>
 ...
 ```
 
-or you can compile it using `make`:
+or after renaming and placing under $PATH:
 
 ```bash
-$ make # will create `./build/with` executable from the script
-$ ./build/with echo a b
+$ with echo a b
 echo a b>
 ...
 ```
@@ -44,7 +54,7 @@ echo a b>
 
 ## How to use
 
-- One each line write additional arguments to the base command:
+- Execute a base command with appended arguments:
 
     ```bash
     $ with echo a b
@@ -55,7 +65,7 @@ echo a b>
     hi
     ```
 
-- Supports mutliple lines:
+- Supports mutliline arguments:
 
     ```bash
     echo a b> c\
@@ -68,7 +78,8 @@ echo a b>
     a b c d e
     ```
 
-- If you want to run the base command, append a space:
+- If you want to run the base command without additional arguments,
+  input a space:
 
     ```bash
     echo a b> (space)
@@ -82,7 +93,7 @@ echo a b>
     echo a b c d>
     ```
 
-- You can remove the last argument from the base command using **`-`** (or multiple of it):
+- You can remove the argument(s) from the base command using **`-`** (or multiple of it):
 
     ```bash
     echo a b c d> -
