@@ -176,9 +176,10 @@
 
 (define (evaluate-envars value)
   (call-with-port
-    (open-input-pipe
-      (string-append "echo " value))
-    get-string-all))
+    (open-input-pipe (string-append "echo " value))
+    (lambda (port)
+      (let ((output (get-string-all port)))
+        (substring output 0 (1- (string-length output)))))))
 
 
 (define (repl-loop ctx buf)
@@ -191,7 +192,7 @@
          (repl-loop ctx ""))
         (('set-env name value)
          (setenv name (evaluate-envars value))
-         (repl-loop buf ""))
+         (repl-loop ctx ""))
         (('new-buf buf)
          (repl-loop ctx buf))
         (('new-ctx ctx)
